@@ -99,7 +99,8 @@ export default function JobDetailsScreen() {
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView 
         style={{ flex: 1 }} 
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
         <ScrollView contentContainerStyle={styles.container}>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
