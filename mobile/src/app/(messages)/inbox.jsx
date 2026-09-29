@@ -1,23 +1,27 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useState, useCallback } from 'react';
+import { 
+  View, Text, StyleSheet, FlatList, TouchableOpacity, 
+  ActivityIndicator, Alert 
+} from 'react-native';
+import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.166.209.25:5000';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.137.94.25:5000';
 
 export default function InboxScreen() {
   const [inbox, setInbox] = useState([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  useEffect(() => {
-    fetchInbox();
-  }, []);
-
   const fetchInbox = async () => {
     try {
       const token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        router.replace('/(auth)/login');
+        return;
+      }
+
       const response = await fetch(`${API_URL}/api/chat/inbox`, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -28,74 +32,90 @@ export default function InboxScreen() {
       if (response.ok && data.success) {
         setInbox(data.data);
       } else {
-        Alert.alert('Error', data.message || 'Could not fetch messages');
+        console.error('Inbox error:', data.message);
       }
     } catch (error) {
       console.error(error);
-      Alert.alert('Error', 'Failed to connect to server');
     } finally {
       setLoading(false);
     }
   };
 
-  const renderInboxItem = ({ item }) => (
-    <TouchableOpacity 
-      style={styles.inboxItem}
-      onPress={() => router.push(`/(messages)/chat?partnerId=${item.partnerId}&partnerName=${item.partnerName}`)}
-    >
-      <View style={styles.avatarPlaceholder}>
-        <Text style={styles.avatarInitial}>{item.partnerName ? item.partnerName[0] : '?'}</Text>
-      </View>
-      <View style={styles.messageDetails}>
-        <View style={styles.messageHeader}>
-          <Text style={styles.partnerName}>{item.partnerName}</Text>
-          <Text style={styles.timestamp}>
-            {new Date(item.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-          </Text>
-        </View>
-        <View style={styles.messagePreviewRow}>
-          <Text style={styles.lastMessage} numberOfLines={1}>
-            {item.lastMessage}
-          </Text>
-          {item.unreadCount > 0 && (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadCount}>{item.unreadCount}</Text>
-            </View>
-          )}
-        </View>
-      </View>
-    </TouchableOpacity>
+  useFocusEffect(
+    useCallback(() => {
+      fetchInbox();
+    }, [])
   );
 
-  if (loading) {
+  const renderInboxItem = ({ item }) => {
+    const initial = item.partnerName ? item.partnerName.charAt(0).toUpperCase() : '?';
+
     return (
-      <View style={[styles.container, { justifyContent: 'center' }]}>
-        <ActivityIndicator size="large" color="#0066cc" />
-      </View>
+      <TouchableOpacity 
+        style={styles.inboxItem}
+        activeOpacity={0.7}
+        onPress={() => router.push(`/(messages)/chat?partnerId=${item.partnerId}&partnerName=${item.partnerName}`)}
+      >
+        <View style={styles.avatar}>
+          <Text style={styles.avatarText}>{initial}</Text>
+        </View>
+
+        <View style={styles.messageDetails}>
+          <View style={styles.topRow}>
+            <Text style={styles.partnerName} numberOfLines={1}>{item.partnerName}</Text>
+            <Text style={styles.timestamp}>
+              {new Date(item.lastMessageTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </Text>
+          </View>
+
+          <View style={styles.bottomRow}>
+            <Text style={styles.lastMessage} numberOfLines={1}>
+              {item.lastMessage}
+            </Text>
+            {item.unreadCount > 0 && (
+              <View style={styles.unreadBadge}>
+                <Text style={styles.unreadCount}>{item.unreadCount}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </TouchableOpacity>
     );
-  }
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backButtonText}>← Back</Text>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <Text style={styles.backBtnText}>← Back</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Messages</Text>
-        <View style={{ width: 50 }} />
+        <View style={{ width: 60 }} />
       </View>
 
-      <FlatList
-        data={inbox}
-        keyExtractor={item => item.partnerId.toString()}
-        renderItem={renderInboxItem}
-        contentContainerStyle={styles.listContainer}
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>No messages yet.</Text>
-          </View>
-        }
-      />
+      {/* Inbox List */}
+      {loading ? (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#000000" />
+        </View>
+      ) : inbox.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyIcon}>💬</Text>
+          <Text style={styles.emptyTitle}>No Messages Yet</Text>
+          <Text style={styles.emptySubtitle}>
+            When you connect with clients or professionals about a job, your chat conversations will appear here.
+          </Text>
+        </View>
+      ) : (
+        <FlatList
+          data={inbox}
+          keyExtractor={item => item.partnerId.toString()}
+          renderItem={renderInboxItem}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+        />
+      )}
     </SafeAreaView>
   );
 }
@@ -103,114 +123,135 @@ export default function InboxScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
   },
-  container: {
+  centerContainer: {
     flex: 1,
-    backgroundColor: '#f4f6f8',
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 15,
-    backgroundColor: '#fff',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#F0F0F0',
   },
-  backButton: {
-    padding: 5,
+  backBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#000000',
+    borderRadius: 20,
   },
-  backButtonText: {
-    color: '#0066cc',
-    fontSize: 16,
-    fontWeight: 'bold',
+  backBtnText: {
+    color: '#000000',
+    fontSize: 13,
+    fontWeight: '700',
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '800',
+    color: '#000000',
+    letterSpacing: -0.3,
   },
   listContainer: {
-    padding: 15,
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 30,
+    gap: 10,
   },
   inboxItem: {
     flexDirection: 'row',
-    backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
     alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#EAEAEA',
   },
-  avatarPlaceholder: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#0066cc',
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 15,
+    marginRight: 14,
   },
-  avatarInitial: {
-    color: '#fff',
+  avatarText: {
+    color: '#FFFFFF',
     fontSize: 20,
-    fontWeight: 'bold',
-    textTransform: 'uppercase',
+    fontWeight: '900',
   },
   messageDetails: {
     flex: 1,
+    gap: 4,
   },
-  messageHeader: {
+  topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 5,
+    alignItems: 'center',
   },
   partnerName: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
+    fontWeight: '800',
+    color: '#000000',
+    flex: 1,
+    marginRight: 8,
   },
   timestamp: {
     fontSize: 12,
-    color: '#888',
+    color: '#999999',
+    fontWeight: '600',
   },
-  messagePreviewRow: {
+  bottomRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
   lastMessage: {
-    flex: 1,
     fontSize: 14,
-    color: '#666',
+    color: '#666666',
+    flex: 1,
     marginRight: 10,
   },
   unreadBadge: {
-    backgroundColor: '#dc3545',
+    backgroundColor: '#000000',
     borderRadius: 10,
-    paddingHorizontal: 6,
+    paddingHorizontal: 8,
     paddingVertical: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
     minWidth: 20,
+    alignItems: 'center',
   },
   unreadCount: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 'bold',
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
   },
   emptyState: {
+    flex: 1,
     alignItems: 'center',
-    marginTop: 50,
+    justifyContent: 'center',
+    paddingHorizontal: 36,
   },
-  emptyStateText: {
-    color: '#888',
-    fontStyle: 'italic',
-    fontSize: 16,
-  }
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#000000',
+    marginBottom: 6,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: '#999999',
+    textAlign: 'center',
+    lineHeight: 20,
+  },
 });

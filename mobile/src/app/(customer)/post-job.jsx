@@ -1,10 +1,17 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { 
+  View, Text, TextInput, TouchableOpacity, StyleSheet, 
+  Alert, ScrollView, KeyboardAvoidingView, Platform, ActivityIndicator 
+} from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.166.209.25:5000';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.137.94.25:5000';
+
+const SUGGESTED_CATEGORIES = [
+  'Plumbing', 'Electrical', 'Cleaning', 'Handyman', 'Painting', 'Moving', 'Tech Support'
+];
 
 export default function PostJobScreen() {
   const [title, setTitle] = useState('');
@@ -17,14 +24,20 @@ export default function PostJobScreen() {
   const router = useRouter();
 
   const handlePostJob = async () => {
-    if (!title || !description || !category || !location) {
-      Alert.alert('Error', 'Please fill in all required fields.');
+    if (!title.trim() || !description.trim() || !category.trim() || !location.trim()) {
+      Alert.alert('Incomplete Form', 'Please provide a title, category, description, and location.');
       return;
     }
 
     setLoading(true);
     try {
       const token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        Alert.alert('Session Expired', 'Please log in again to post a job.');
+        router.replace('/(auth)/login');
+        return;
+      }
+
       const response = await fetch(`${API_URL}/api/jobs`, {
         method: 'POST',
         headers: { 
@@ -32,25 +45,26 @@ export default function PostJobScreen() {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({ 
-          title, 
-          description, 
-          category, 
+          title: title.trim(), 
+          description: description.trim(), 
+          category: category.trim(), 
           budget: budget ? parseFloat(budget) : null,
-          location
+          location: location.trim()
         }),
       });
       
       const data = await response.json();
       
       if (response.ok && data.success) {
-        Alert.alert('Success', 'Job posted successfully!');
-        router.replace('/(customer)/dashboard');
+        Alert.alert('Job Posted', 'Your job has been published for Doers to apply!', [
+          { text: 'View Dashboard', onPress: () => router.replace('/(customer)/dashboard') }
+        ]);
       } else {
         Alert.alert('Error', data.message || 'Failed to post job');
       }
     } catch (error) {
       console.error(error);
-      Alert.alert('Error', 'Failed to connect to server.');
+      Alert.alert('Connection Error', 'Could not connect to the server.');
     } finally {
       setLoading(false);
     }
@@ -61,63 +75,126 @@ export default function PostJobScreen() {
       <KeyboardAvoidingView 
         style={{ flex: 1 }} 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
-        <ScrollView contentContainerStyle={styles.container}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backButtonText}>← Back</Text>
-        </TouchableOpacity>
-
-        <Text style={styles.title}>Post a Job</Text>
-        <Text style={styles.subtitle}>Describe what you need help with so Doers can apply.</Text>
-
-        <TextInput
-          style={styles.input}
-          placeholder="Job Title (e.g. Need a Plumber for a leak)"
-          value={title}
-          onChangeText={setTitle}
-        />
-        
-        <TextInput
-          style={[styles.input, styles.textArea]}
-          placeholder="Detailed Description"
-          value={description}
-          onChangeText={setDescription}
-          multiline
-          numberOfLines={4}
-          textAlignVertical="top"
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Category (e.g. Plumbing, Cleaning)"
-          value={category}
-          onChangeText={setCategory}
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Estimated Budget ($)"
-          value={budget}
-          onChangeText={setBudget}
-          keyboardType="numeric"
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Location (e.g. New York, NY)"
-          value={location}
-          onChangeText={setLocation}
-        />
-
-        <TouchableOpacity 
-          style={[styles.button, loading && styles.buttonDisabled]} 
-          onPress={handlePostJob}
-          disabled={loading}
+        <ScrollView 
+          contentContainerStyle={styles.container}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          <Text style={styles.buttonText}>{loading ? 'Posting...' : 'Post Job'}</Text>
-        </TouchableOpacity>
-      </ScrollView>
+          {/* Top Bar */}
+          <View style={styles.topBar}>
+            <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+              <Text style={styles.backBtnText}>← Back</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={styles.title}>Post a New Job</Text>
+            <Text style={styles.subtitle}>
+              Describe your project so qualified professionals can submit quotes.
+            </Text>
+          </View>
+
+          {/* Form */}
+          <View style={styles.form}>
+            {/* Title */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>JOB TITLE *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. Fix leaking bathroom sink pipe"
+                placeholderTextColor="#999999"
+                value={title}
+                onChangeText={setTitle}
+              />
+            </View>
+
+            {/* Category */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>CATEGORY *</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. Plumbing"
+                placeholderTextColor="#999999"
+                value={category}
+                onChangeText={setCategory}
+              />
+              {/* Category Suggestions */}
+              <ScrollView 
+                horizontal 
+                showsHorizontalScrollIndicator={false} 
+                contentContainerStyle={styles.chipsScroll}
+              >
+                {SUGGESTED_CATEGORIES.map((cat, i) => (
+                  <TouchableOpacity
+                    key={i}
+                    style={[styles.chip, category.toLowerCase() === cat.toLowerCase() && styles.chipActive]}
+                    onPress={() => setCategory(cat)}
+                  >
+                    <Text style={[styles.chipText, category.toLowerCase() === cat.toLowerCase() && styles.chipTextActive]}>
+                      {cat}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            {/* Description */}
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>DETAILED DESCRIPTION *</Text>
+              <TextInput
+                style={[styles.input, styles.textArea]}
+                placeholder="Provide details about the task, requirements, timing, and any materials needed..."
+                placeholderTextColor="#999999"
+                value={description}
+                onChangeText={setDescription}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+              />
+            </View>
+
+            {/* Budget & Location in 2 Columns */}
+            <View style={styles.row}>
+              <View style={[styles.inputGroup, { flex: 1 }]}>
+                <Text style={styles.inputLabel}>BUDGET ($)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Optional"
+                  placeholderTextColor="#999999"
+                  value={budget}
+                  onChangeText={setBudget}
+                  keyboardType="numeric"
+                />
+              </View>
+
+              <View style={[styles.inputGroup, { flex: 1 }]}>
+                <Text style={styles.inputLabel}>LOCATION *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="City, State"
+                  placeholderTextColor="#999999"
+                  value={location}
+                  onChangeText={setLocation}
+                />
+              </View>
+            </View>
+
+            {/* Submit Button */}
+            <TouchableOpacity 
+              style={[styles.primaryButton, loading && styles.buttonDisabled]} 
+              onPress={handlePostJob}
+              disabled={loading}
+            >
+              {loading ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.primaryButtonText}>+ Publish Job</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -126,56 +203,113 @@ export default function PostJobScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
   },
   container: {
-    padding: 20,
+    flexGrow: 1,
+    paddingHorizontal: 24,
     paddingBottom: 40,
   },
-  backButton: {
-    marginBottom: 20,
+  topBar: {
+    paddingVertical: 12,
+    alignItems: 'flex-start',
   },
-  backButtonText: {
-    color: '#0066cc',
-    fontSize: 16,
-    fontWeight: 'bold',
+  backBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#000000',
+    borderRadius: 20,
+  },
+  backBtnText: {
+    color: '#000000',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  header: {
+    marginTop: 12,
+    marginBottom: 24,
   },
   title: {
     fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#333',
+    fontWeight: '900',
+    letterSpacing: -0.5,
+    color: '#000000',
+    marginBottom: 8,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#666',
-    marginBottom: 30,
+    fontSize: 15,
+    color: '#666666',
+    lineHeight: 22,
+  },
+  form: {
+    gap: 18,
+  },
+  inputGroup: {
+    gap: 6,
+  },
+  inputLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#000000',
+    letterSpacing: 0.5,
   },
   input: {
+    backgroundColor: '#FAFAFA',
     borderWidth: 1,
-    borderColor: '#ddd',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 15,
+    borderColor: '#EAEAEA',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
     fontSize: 16,
-    backgroundColor: '#f9f9f9',
+    color: '#000000',
   },
   textArea: {
     height: 120,
+    paddingTop: 14,
   },
-  button: {
-    backgroundColor: '#0066cc',
-    padding: 15,
-    borderRadius: 8,
+  chipsScroll: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingTop: 6,
+  },
+  chip: {
+    backgroundColor: '#F5F5F5',
+    borderWidth: 1,
+    borderColor: '#EAEAEA',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  chipActive: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
+  chipText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#666666',
+  },
+  chipTextActive: {
+    color: '#FFFFFF',
+  },
+  row: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  primaryButton: {
+    backgroundColor: '#000000',
+    paddingVertical: 18,
+    borderRadius: 12,
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 10,
   },
   buttonDisabled: {
-    backgroundColor: '#80b3e6',
+    backgroundColor: '#888888',
   },
-  buttonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  }
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+  },
 });

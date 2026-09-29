@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, TextInput, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { 
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, 
+  ActivityIndicator, TextInput, Alert, KeyboardAvoidingView, Platform 
+} from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.166.209.25:5000';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.137.94.25:5000';
 
-export default function JobDetailsScreen() {
+export default function DoerJobDetailsScreen() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   
@@ -42,15 +45,15 @@ export default function JobDetailsScreen() {
       }
     } catch (error) {
       console.error(error);
-      Alert.alert('Error', 'Failed to connect to server');
+      Alert.alert('Connection Error', 'Failed to connect to server');
     } finally {
       setLoading(false);
     }
   };
 
   const handleApply = async () => {
-    if (!coverLetter) {
-      Alert.alert('Error', 'Please provide a cover letter or message to the client.');
+    if (!coverLetter.trim()) {
+      Alert.alert('Missing Cover Letter', 'Please provide a message or proposal to the client.');
       return;
     }
 
@@ -64,7 +67,7 @@ export default function JobDetailsScreen() {
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          coverLetter,
+          coverLetter: coverLetter.trim(),
           proposedPrice: proposedPrice ? parseFloat(proposedPrice) : null
         })
       });
@@ -72,14 +75,15 @@ export default function JobDetailsScreen() {
       const data = await response.json();
       
       if (response.ok && data.success) {
-        Alert.alert('Success', 'Your application has been submitted!');
-        router.replace('/(doer)/job-board');
+        Alert.alert('Application Submitted', 'Your proposal was sent to the client!', [
+          { text: 'OK', onPress: () => router.replace('/(doer)/job-board') }
+        ]);
       } else {
-        Alert.alert('Error', data.message || 'Failed to apply');
+        Alert.alert('Submission Error', data.message || 'Failed to submit application');
       }
     } catch (error) {
       console.error(error);
-      Alert.alert('Error', 'Failed to connect to server');
+      Alert.alert('Connection Error', 'Failed to connect to server');
     } finally {
       setApplying(false);
     }
@@ -87,113 +91,136 @@ export default function JobDetailsScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.container, { justifyContent: 'center' }]}>
-        <ActivityIndicator size="large" color="#0066cc" />
+      <View style={styles.centerContainer}>
+        <ActivityIndicator size="large" color="#000000" />
       </View>
     );
   }
 
   if (!job) return null;
 
+  const isOpen = job.status === 'open';
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <KeyboardAvoidingView 
         style={{ flex: 1 }} 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
-        <ScrollView contentContainerStyle={styles.container}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Text style={styles.backButtonText}>← Back to Jobs</Text>
+        {/* Top Header */}
+        <View style={styles.header}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+            <Text style={styles.backBtnText}>← Back</Text>
           </TouchableOpacity>
+          <View style={[styles.statusBadge, isOpen ? styles.statusBadgeOpen : styles.statusBadgeClosed]}>
+            <Text style={[styles.statusBadgeText, isOpen ? styles.statusTextOpen : styles.statusTextClosed]}>
+              {job.status?.toUpperCase()}
+            </Text>
+          </View>
+        </View>
 
-          <View style={styles.jobHeader}>
+        <ScrollView 
+          contentContainerStyle={styles.container} 
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Job Info Card */}
+          <View style={styles.card}>
             <Text style={styles.title}>{job.title}</Text>
-            <View style={styles.badgeContainer}>
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{job.category}</Text>
+            
+            <View style={styles.metaRow}>
+              <View style={styles.categoryChip}>
+                <Text style={styles.categoryChipText}>{job.category}</Text>
               </View>
-              <View style={[styles.badge, { backgroundColor: '#e6f4ea' }]}>
-                <Text style={[styles.badgeText, { color: '#137333' }]}>{job.status.toUpperCase()}</Text>
+              <Text style={styles.dot}>•</Text>
+              <Text style={styles.locationText}>📍 {job.location}</Text>
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={styles.detailsGrid}>
+              <View style={styles.detailCol}>
+                <Text style={styles.metaLabel}>CLIENT BUDGET</Text>
+                <Text style={styles.budgetValue}>
+                  {job.budget ? `$${job.budget}` : 'Negotiable'}
+                </Text>
+              </View>
+
+              <View style={styles.detailCol}>
+                <Text style={styles.metaLabel}>POSTED BY</Text>
+                <Text style={styles.clientName}>{job.customer?.fullName || 'Client'}</Text>
               </View>
             </View>
-          </View>
 
-          <View style={styles.detailsCard}>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Location:</Text>
-              <Text style={styles.detailValue}>{job.location}</Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Budget:</Text>
-              <Text style={styles.detailValue}>{job.budget ? `$${job.budget}` : 'Negotiable'}</Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Posted By:</Text>
-              <Text style={styles.detailValue}>{job.customer?.fullName}</Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Date Posted:</Text>
-              <Text style={styles.detailValue}>{new Date(job.createdAt).toLocaleDateString()}</Text>
-            </View>
-          </View>
+            <View style={styles.divider} />
 
-          <View style={styles.descriptionContainer}>
-            <Text style={styles.sectionTitle}>Job Description</Text>
+            <Text style={styles.metaLabel}>PROJECT DETAILS</Text>
             <Text style={styles.descriptionText}>{job.description}</Text>
           </View>
 
-          {job.status === 'open' && (
-            <View style={styles.applyContainer}>
-              <Text style={styles.sectionTitle}>Submit Application</Text>
-              
-              <Text style={styles.inputLabel}>Proposed Price ($)</Text>
-              <TextInput
-                style={styles.input}
-                value={proposedPrice}
-                onChangeText={setProposedPrice}
-                keyboardType="numeric"
-                placeholder="e.g. 150"
-              />
+          {/* Assigned Banner */}
+          {job.isAssignedToMe && (
+            <View style={styles.assignedCard}>
+              <View style={styles.assignedBadge}>
+                <Text style={styles.assignedBadgeText}>✓ YOU ARE ASSIGNED</Text>
+              </View>
+              <Text style={styles.assignedTitle}>You got the job!</Text>
+              <Text style={styles.assignedSubtitle}>
+                Reach out to the client to coordinate schedule, materials, and project kick-off.
+              </Text>
+              <TouchableOpacity 
+                style={styles.primaryAction}
+                onPress={() => router.push(`/(messages)/chat?partnerId=${job.customerId}&partnerName=${job.customer?.fullName}`)}
+              >
+                <Text style={styles.primaryActionText}>Message Client</Text>
+              </TouchableOpacity>
+            </View>
+          )}
 
-              <Text style={styles.inputLabel}>Cover Letter / Message</Text>
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                value={coverLetter}
-                onChangeText={setCoverLetter}
-                placeholder="Why are you the best person for this job? What's your availability?"
-                multiline
-                numberOfLines={5}
-                textAlignVertical="top"
-              />
+          {/* Proposal / Application Form */}
+          {isOpen && !job.isAssignedToMe && (
+            <View style={styles.proposalSection}>
+              <Text style={styles.sectionTitle}>SUBMIT YOUR PROPOSAL</Text>
+              
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>YOUR PROPOSED PRICE ($)</Text>
+                <TextInput
+                  style={styles.input}
+                  value={proposedPrice}
+                  onChangeText={setProposedPrice}
+                  keyboardType="numeric"
+                  placeholder="e.g. 150"
+                  placeholderTextColor="#999999"
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>COVER LETTER / PROPOSAL NOTE *</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  value={coverLetter}
+                  onChangeText={setCoverLetter}
+                  placeholder="Explain your relevant experience, when you can start, and why you are the best fit..."
+                  placeholderTextColor="#999999"
+                  multiline
+                  numberOfLines={4}
+                  textAlignVertical="top"
+                />
+              </View>
 
               <TouchableOpacity 
-                style={[styles.applyButton, applying && styles.applyButtonDisabled]}
+                style={[styles.primaryAction, applying && styles.buttonDisabled]}
                 onPress={handleApply}
                 disabled={applying}
               >
-                <Text style={styles.applyButtonText}>
-                  {applying ? 'Submitting...' : 'Apply Now'}
-                </Text>
+                {applying ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.primaryActionText}>Submit Application</Text>
+                )}
               </TouchableOpacity>
             </View>
           )}
-
-          {job.isAssignedToMe && (
-            <View style={styles.applyContainer}>
-              <Text style={styles.sectionTitle}>You are assigned to this job!</Text>
-              <Text style={{ marginBottom: 15, color: '#555' }}>
-                Communicate with the client to work out the details.
-              </Text>
-              <TouchableOpacity 
-                style={[styles.applyButton, { backgroundColor: '#28a745' }]}
-                onPress={() => router.push(`/(messages)/chat?partnerId=${job.customerId}&partnerName=${job.customer?.fullName}`)}
-              >
-                <Text style={styles.applyButtonText}>Message Client</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -203,117 +230,227 @@ export default function JobDetailsScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#FFFFFF',
   },
-  container: {
-    padding: 20,
-    paddingBottom: 40,
+  centerContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
   },
-  backButton: {
-    marginBottom: 20,
-  },
-  backButtonText: {
-    color: '#0066cc',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  jobHeader: {
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 26,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 10,
-  },
-  badgeContainer: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  badge: {
-    backgroundColor: '#eee',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-  },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#555',
-  },
-  detailsCard: {
-    backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#eaeaea',
-  },
-  detailRow: {
+  header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  backBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#000000',
+    borderRadius: 20,
+  },
+  backBtnText: {
+    color: '#000000',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  statusBadgeOpen: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#000000',
+  },
+  statusBadgeClosed: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  statusTextOpen: {
+    color: '#000000',
+  },
+  statusTextClosed: {
+    color: '#FFFFFF',
+  },
+  container: {
+    paddingHorizontal: 24,
+    paddingBottom: 40,
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#EAEAEA',
+    padding: 20,
+    marginTop: 16,
+  },
+  title: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: -0.4,
     marginBottom: 8,
   },
-  detailLabel: {
-    color: '#666',
-    fontWeight: '500',
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  detailValue: {
-    color: '#333',
-    fontWeight: 'bold',
+  categoryChip: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
   },
-  descriptionContainer: {
-    marginBottom: 30,
+  categoryChipText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '700',
   },
-  sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#333',
+  dot: {
+    color: '#999999',
+  },
+  locationText: {
+    fontSize: 13,
+    color: '#666666',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#F0F0F0',
+    marginVertical: 14,
+  },
+  detailsGrid: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  detailCol: {
+    gap: 4,
+  },
+  metaLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#999999',
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  budgetValue: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#000000',
+  },
+  clientName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#000000',
   },
   descriptionText: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: '#444',
+    fontSize: 15,
+    lineHeight: 22,
+    color: '#333333',
   },
-  applyContainer: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderRadius: 8,
+
+  // --- Assigned Section ---
+  assignedCard: {
+    backgroundColor: '#FAFAFA',
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#eaeaea',
+    borderColor: '#000000',
+    padding: 20,
+    marginTop: 20,
+    alignItems: 'center',
+  },
+  assignedBadge: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 20,
+    marginBottom: 10,
+  },
+  assignedBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '800',
+  },
+  assignedTitle: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: '#000000',
+    marginBottom: 6,
+  },
+  assignedSubtitle: {
+    fontSize: 14,
+    color: '#666666',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 16,
+  },
+
+  // --- Proposal Form ---
+  proposalSection: {
+    marginTop: 20,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#EAEAEA',
+    padding: 20,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: '#000000',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 16,
+  },
+  inputGroup: {
+    gap: 6,
+    marginBottom: 14,
   },
   inputLabel: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 5,
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#000000',
+    letterSpacing: 0.5,
   },
   input: {
+    backgroundColor: '#FAFAFA',
     borderWidth: 1,
-    borderColor: '#ddd',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 15,
-    fontSize: 16,
-    backgroundColor: '#f9f9f9',
+    borderColor: '#EAEAEA',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: '#000000',
   },
   textArea: {
-    height: 120,
+    height: 100,
   },
-  applyButton: {
-    backgroundColor: '#0066cc',
-    padding: 15,
-    borderRadius: 8,
+  primaryAction: {
+    backgroundColor: '#000000',
+    paddingVertical: 16,
+    borderRadius: 12,
     alignItems: 'center',
-    marginTop: 10,
+    width: '100%',
+    marginTop: 8,
   },
-  applyButtonDisabled: {
-    backgroundColor: '#80b3e6',
+  buttonDisabled: {
+    backgroundColor: '#888888',
   },
-  applyButtonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
-  }
+  primaryActionText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 15,
+  },
 });

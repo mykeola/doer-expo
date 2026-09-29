@@ -1,13 +1,19 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { 
+  View, Text, StyleSheet, FlatList, TouchableOpacity, 
+  ActivityIndicator, ScrollView 
+} from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.166.209.25:5000';
+const API_URL = process.env.EXPO_PUBLIC_API_URL || 'http://10.137.94.25:5000';
+
+const CATEGORIES = ['All', 'Plumbing', 'Electrical', 'Cleaning', 'Handyman', 'Painting', 'Moving', 'Technology'];
 
 export default function JobBoardScreen() {
   const [jobs, setJobs] = useState([]);
+  const [selectedCategory, setSelectedCategory] = useState('All');
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
@@ -45,53 +51,108 @@ export default function JobBoardScreen() {
     }, [])
   );
 
+  const filteredJobs = jobs.filter(job => {
+    if (selectedCategory === 'All') return true;
+    return job.category && job.category.toLowerCase().includes(selectedCategory.toLowerCase());
+  });
+
   const renderJobItem = ({ item }) => (
     <TouchableOpacity 
       style={styles.jobCard}
+      activeOpacity={0.8}
       onPress={() => router.push(`/(doer)/job/${item.id}`)}
     >
-      <View style={styles.jobHeader}>
-        <Text style={styles.jobTitle}>{item.title}</Text>
-        {item.budget && (
-          <Text style={styles.jobBudget}>${item.budget}</Text>
-        )}
+      <View style={styles.jobCardTop}>
+        <View style={styles.titleWrap}>
+          <Text style={styles.jobTitle} numberOfLines={2}>{item.title}</Text>
+          <Text style={styles.jobMeta}>{item.category} • {item.location}</Text>
+        </View>
+        <View style={styles.budgetPill}>
+          <Text style={styles.budgetText}>
+            {item.budget ? `$${item.budget}` : 'Flexible'}
+          </Text>
+        </View>
       </View>
-      <Text style={styles.jobCategory}>{item.category} • {item.location}</Text>
-      
-      <Text style={styles.jobDescription} numberOfLines={2}>
-        {item.description}
-      </Text>
 
-      <View style={styles.footer}>
-        <Text style={styles.postedBy}>Posted by: {item.customer?.fullName}</Text>
-        <Text style={styles.applyText}>View & Apply →</Text>
+      <View style={styles.jobCardMiddle}>
+        <Text style={styles.jobDescription} numberOfLines={2}>
+          {item.description}
+        </Text>
+      </View>
+
+      <View style={styles.jobCardBottom}>
+        <Text style={styles.postedByText}>Client: {item.customer?.fullName || 'Client'}</Text>
+        <Text style={styles.applyLinkText}>View & Apply →</Text>
       </View>
     </TouchableOpacity>
   );
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      {/* Top Header */}
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backButtonText}>← Back</Text>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <Text style={styles.backBtnText}>← Back</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Available Jobs</Text>
-        <View style={{ width: 50 }} />
+        <Text style={styles.headerTitle}>Job Board</Text>
+        <View style={styles.countBadge}>
+          <Text style={styles.countText}>{filteredJobs.length}</Text>
+        </View>
       </View>
 
+      {/* Category Pills */}
+      <View style={styles.filterSection}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoriesScroll}
+        >
+          {CATEGORIES.map((cat, i) => {
+            const active = selectedCategory.toLowerCase() === cat.toLowerCase();
+            return (
+              <TouchableOpacity
+                key={i}
+                style={[styles.categoryChip, active && styles.categoryChipActive]}
+                onPress={() => setSelectedCategory(cat)}
+              >
+                <Text style={[styles.categoryChipText, active && styles.categoryChipTextActive]}>
+                  {cat}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      {/* Jobs List */}
       <View style={styles.listContainer}>
         {loading ? (
-          <ActivityIndicator size="large" color="#0066cc" style={styles.loader} />
-        ) : jobs.length === 0 ? (
+          <ActivityIndicator size="large" color="#000000" style={styles.loader} />
+        ) : filteredJobs.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>No open jobs available right now.</Text>
+            <Text style={styles.emptyIcon}>📋</Text>
+            <Text style={styles.emptyTitle}>No Jobs Available</Text>
+            <Text style={styles.emptySubtitle}>
+              {selectedCategory === 'All'
+                ? 'There are no open jobs at the moment. Check back soon!'
+                : `No open jobs in ${selectedCategory}. Try viewing all categories.`}
+            </Text>
+            {selectedCategory !== 'All' && (
+              <TouchableOpacity 
+                style={styles.resetBtn} 
+                onPress={() => setSelectedCategory('All')}
+              >
+                <Text style={styles.resetBtnText}>View All Categories</Text>
+              </TouchableOpacity>
+            )}
           </View>
         ) : (
           <FlatList
-            data={jobs}
+            data={filteredJobs}
             keyExtractor={(item) => item.id.toString()}
             renderItem={renderJobItem}
             contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
           />
         )}
       </View>
@@ -102,102 +163,188 @@ export default function JobBoardScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#FFFFFF',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    padding: 20,
-    backgroundColor: '#fff',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    borderBottomColor: '#F0F0F0',
   },
-  backButtonText: {
-    color: '#0066cc',
-    fontSize: 16,
-    fontWeight: 'bold',
+  backBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderWidth: 1,
+    borderColor: '#000000',
+    borderRadius: 20,
+  },
+  backBtnText: {
+    color: '#000000',
+    fontSize: 13,
+    fontWeight: '700',
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#000000',
+    letterSpacing: -0.3,
+  },
+  countBadge: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  countText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  filterSection: {
+    paddingVertical: 10,
+  },
+  categoriesScroll: {
+    paddingHorizontal: 24,
+    gap: 8,
+  },
+  categoryChip: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#EAEAEA',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  categoryChipActive: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
+  categoryChipText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#666666',
+  },
+  categoryChipTextActive: {
+    color: '#FFFFFF',
   },
   listContainer: {
     flex: 1,
-    paddingHorizontal: 15,
-    paddingTop: 15,
+    paddingHorizontal: 24,
   },
   loader: {
     marginTop: 50,
   },
-  emptyState: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 40,
-    backgroundColor: '#fff',
-    borderRadius: 8,
-  },
-  emptyStateText: {
-    color: '#666',
-    fontSize: 16,
-  },
   listContent: {
-    paddingBottom: 20,
+    paddingTop: 8,
+    paddingBottom: 30,
+    gap: 12,
   },
   jobCard: {
-    backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 15,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#EAEAEA',
+    overflow: 'hidden',
   },
-  jobHeader: {
+  jobCardTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 5,
+    padding: 16,
+    paddingBottom: 10,
+  },
+  titleWrap: {
+    flex: 1,
+    marginRight: 12,
   },
   jobTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    flex: 1,
-    marginRight: 10,
-  },
-  jobBudget: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#28a745',
+    fontWeight: '800',
+    color: '#000000',
+    marginBottom: 4,
   },
-  jobCategory: {
-    color: '#666',
-    marginBottom: 10,
+  jobMeta: {
+    fontSize: 13,
+    color: '#999999',
+  },
+  budgetPill: {
+    backgroundColor: '#FAFAFA',
+    borderWidth: 1,
+    borderColor: '#EAEAEA',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  budgetText: {
     fontSize: 14,
+    fontWeight: '900',
+    color: '#000000',
+  },
+  jobCardMiddle: {
+    paddingHorizontal: 16,
+    paddingBottom: 14,
   },
   jobDescription: {
-    color: '#444',
-    marginBottom: 15,
+    fontSize: 14,
     lineHeight: 20,
+    color: '#555555',
   },
-  footer: {
+  jobCardBottom: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FAFAFA',
     borderTopWidth: 1,
-    borderTopColor: '#eee',
-    paddingTop: 12,
+    borderTopColor: '#F0F0F0',
   },
-  postedBy: {
-    color: '#888',
+  postedByText: {
     fontSize: 12,
+    color: '#888888',
+    fontWeight: '600',
   },
-  applyText: {
-    color: '#0066cc',
-    fontWeight: 'bold',
-  }
+  applyLinkText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#000000',
+  },
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 30,
+    paddingVertical: 60,
+  },
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#000000',
+    marginBottom: 6,
+  },
+  emptySubtitle: {
+    fontSize: 14,
+    color: '#999999',
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  resetBtn: {
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: '#000000',
+    borderRadius: 20,
+  },
+  resetBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#000000',
+  },
 });

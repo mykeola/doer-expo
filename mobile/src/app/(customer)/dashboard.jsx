@@ -50,69 +50,102 @@ export default function CustomerDashboardScreen() {
     router.replace('/');
   };
 
+  const getStatusLabel = (status) => {
+    switch (status) {
+      case 'open': return 'OPEN';
+      case 'in_progress': return 'IN PROGRESS';
+      case 'completed': return 'COMPLETED';
+      default: return status?.toUpperCase();
+    }
+  };
+
   const renderJobItem = ({ item }) => (
     <TouchableOpacity 
       style={styles.jobCard}
       onPress={() => router.push(`/(customer)/job/${item.id}`)}
     >
-      <View style={styles.jobHeader}>
-        <Text style={styles.jobTitle}>{item.title}</Text>
-        <View style={[styles.statusBadge, styles[`status_${item.status}`]]}>
-          <Text style={styles.statusText}>{item.status.toUpperCase()}</Text>
+      <View style={styles.jobCardTop}>
+        <View style={styles.jobTitleWrap}>
+          <Text style={styles.jobTitle} numberOfLines={2}>{item.title}</Text>
+          <Text style={styles.jobMeta}>{item.category} • {item.location}</Text>
+        </View>
+        <View style={[
+          styles.statusBadge, 
+          item.status === 'open' && styles.statusOpen,
+          item.status === 'in_progress' && styles.statusInProgress,
+          item.status === 'completed' && styles.statusCompleted,
+        ]}>
+          <Text style={[
+            styles.statusText,
+            item.status === 'open' && styles.statusTextOpen,
+            item.status === 'in_progress' && styles.statusTextInProgress,
+            item.status === 'completed' && styles.statusTextCompleted,
+          ]}>{getStatusLabel(item.status)}</Text>
         </View>
       </View>
-      <Text style={styles.jobCategory}>{item.category} • {item.location}</Text>
-      
-      <View style={styles.applicationsContainer}>
+      <View style={styles.jobCardBottom}>
         <Text style={styles.applicationsText}>
           {item.applications && item.applications.length > 0 
-            ? `${item.applications.length} Applications` 
+            ? `${item.applications.length} application${item.applications.length > 1 ? 's' : ''}` 
             : 'No applications yet'}
         </Text>
+        <Text style={styles.viewText}>View →</Text>
       </View>
     </TouchableOpacity>
   );
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Dashboard</Text>
-        <TouchableOpacity onPress={handleLogout}>
+        <View>
+          <Text style={styles.greeting}>Dashboard</Text>
+        </View>
+        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
           <Text style={styles.logoutText}>Logout</Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.actionContainer}>
+      {/* Quick Actions */}
+      <View style={styles.actionsSection}>
         <TouchableOpacity 
-          style={styles.postJobButton}
+          style={styles.primaryAction}
           onPress={() => router.push('/(customer)/post-job')}
         >
-          <Text style={styles.postJobText}>+ Post a New Job</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.searchButton}
-          onPress={() => router.push('/(customer)/search')}
-        >
-          <Text style={styles.searchText}>Browse Doers</Text>
+          <Text style={styles.primaryActionText}>+ Post a New Job</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={[styles.searchButton, { backgroundColor: '#e6f4ea', borderColor: '#28a745' }]}
-          onPress={() => router.push('/(messages)/inbox')}
-        >
-          <Text style={[styles.searchText, { color: '#28a745' }]}>Messages</Text>
-        </TouchableOpacity>
+        <View style={styles.secondaryRow}>
+          <TouchableOpacity 
+            style={styles.secondaryAction}
+            onPress={() => router.push('/(customer)/search')}
+          >
+            <Text style={styles.secondaryActionText}>Browse Doers</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.secondaryAction}
+            onPress={() => router.push('/(messages)/inbox')}
+          >
+            <Text style={styles.secondaryActionText}>Messages</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
+      {/* Divider */}
+      <View style={styles.divider} />
+
+      {/* Jobs List */}
       <View style={styles.listContainer}>
         <Text style={styles.sectionTitle}>My Posted Jobs</Text>
         
         {loading ? (
-          <ActivityIndicator size="large" color="#0066cc" style={styles.loader} />
+          <ActivityIndicator size="large" color="#000000" style={styles.loader} />
         ) : jobs.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>You haven't posted any jobs yet.</Text>
+            <Text style={styles.emptyIcon}>📋</Text>
+            <Text style={styles.emptyTitle}>No jobs posted yet</Text>
+            <Text style={styles.emptySubtitle}>Tap "Post a New Job" above to get started.</Text>
           </View>
         ) : (
           <FlatList
@@ -120,6 +153,7 @@ export default function CustomerDashboardScreen() {
             keyExtractor={(item) => item.id.toString()}
             renderItem={renderJobItem}
             contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator={false}
           />
         )}
       </View>
@@ -130,135 +164,208 @@ export default function CustomerDashboardScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#FFFFFF',
   },
+
+  // --- Header ---
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 20,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
+    paddingHorizontal: 24,
+    paddingVertical: 20,
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
+  greeting: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#000000',
+    letterSpacing: -0.5,
+  },
+  logoutBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#000000',
+    borderRadius: 20,
   },
   logoutText: {
-    color: '#dc3545',
-    fontWeight: '600',
+    color: '#000000',
+    fontWeight: '700',
+    fontSize: 13,
   },
-  actionContainer: {
+
+  // --- Quick Actions ---
+  actionsSection: {
+    paddingHorizontal: 24,
+    gap: 12,
+  },
+  primaryAction: {
+    backgroundColor: '#000000',
+    paddingVertical: 18,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  primaryActionText: {
+    color: '#FFFFFF',
+    fontWeight: '800',
+    fontSize: 16,
+  },
+  secondaryRow: {
     flexDirection: 'row',
-    padding: 20,
-    gap: 15,
+    gap: 12,
   },
-  postJobButton: {
+  secondaryAction: {
     flex: 1,
-    backgroundColor: '#0066cc',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  postJobText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
-  searchButton: {
-    flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
     borderWidth: 1,
-    borderColor: '#0066cc',
-    padding: 15,
-    borderRadius: 8,
+    borderColor: '#000000',
+    paddingVertical: 14,
+    borderRadius: 12,
     alignItems: 'center',
   },
-  searchText: {
-    color: '#0066cc',
-    fontWeight: 'bold',
-    fontSize: 16,
+  secondaryActionText: {
+    color: '#000000',
+    fontWeight: '700',
+    fontSize: 14,
   },
+
+  // --- Divider ---
+  divider: {
+    height: 1,
+    backgroundColor: '#F0F0F0',
+    marginHorizontal: 24,
+    marginTop: 24,
+    marginBottom: 8,
+  },
+
+  // --- Jobs List ---
   listContainer: {
     flex: 1,
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
+    paddingTop: 16,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    color: '#333',
+    fontSize: 18,
+    fontWeight: '800',
+    marginBottom: 16,
+    color: '#000000',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   loader: {
     marginTop: 50,
   },
+  listContent: {
+    paddingBottom: 30,
+  },
+
+  // --- Empty State ---
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 40,
-    backgroundColor: '#fff',
-    borderRadius: 8,
+    paddingVertical: 60,
   },
-  emptyStateText: {
-    color: '#666',
-    fontSize: 16,
+  emptyIcon: {
+    fontSize: 48,
+    marginBottom: 16,
   },
-  listContent: {
-    paddingBottom: 20,
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#000000',
+    marginBottom: 6,
   },
+  emptySubtitle: {
+    fontSize: 14,
+    color: '#999999',
+    textAlign: 'center',
+  },
+
+  // --- Job Cards ---
   jobCard: {
-    backgroundColor: '#fff',
-    padding: 15,
-    borderRadius: 8,
-    marginBottom: 15,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#eee',
+    borderColor: '#EAEAEA',
+    overflow: 'hidden',
   },
-  jobHeader: {
+  jobCardTop: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    padding: 16,
+    paddingBottom: 12,
+  },
+  jobTitleWrap: {
+    flex: 1,
+    marginRight: 12,
   },
   jobTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    flex: 1,
-    marginRight: 10,
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#000000',
+    marginBottom: 4,
   },
+  jobMeta: {
+    fontSize: 13,
+    color: '#999999',
+  },
+
+  // --- Status Badges ---
   statusBadge: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 6,
+    borderWidth: 1,
   },
-  status_open: {
-    backgroundColor: '#e6f4ea',
+  statusOpen: {
+    backgroundColor: '#FFFFFF',
+    borderColor: '#000000',
   },
-  status_in_progress: {
-    backgroundColor: '#e8f0fe',
+  statusInProgress: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
   },
-  status_completed: {
-    backgroundColor: '#fce8e6',
+  statusCompleted: {
+    backgroundColor: '#F5F5F5',
+    borderColor: '#CCCCCC',
   },
   statusText: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: '#333',
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
-  jobCategory: {
-    color: '#666',
-    marginBottom: 12,
+  statusTextOpen: {
+    color: '#000000',
   },
-  applicationsContainer: {
+  statusTextInProgress: {
+    color: '#FFFFFF',
+  },
+  statusTextCompleted: {
+    color: '#999999',
+  },
+
+  // --- Job Card Footer ---
+  jobCardBottom: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#FAFAFA',
     borderTopWidth: 1,
-    borderTopColor: '#eee',
-    paddingTop: 12,
+    borderTopColor: '#F0F0F0',
   },
   applicationsText: {
-    color: '#0066cc',
+    color: '#666666',
+    fontSize: 13,
     fontWeight: '600',
-  }
+  },
+  viewText: {
+    color: '#000000',
+    fontSize: 13,
+    fontWeight: '800',
+  },
 });
+
